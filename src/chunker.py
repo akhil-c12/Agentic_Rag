@@ -63,7 +63,6 @@ class ScientificChunker:
         Splits text into sentences
         Handles abbreviations like et al. Fig. Dr. etc.
         """
-        # Simple but effective sentence splitter
         sentences = re.split(r'(?<=[.!?])\s+(?=[A-Z])', text)
         # Clean up
         sentences = [s.strip() for s in sentences if len(s.strip()) > 20]
@@ -81,12 +80,11 @@ class ScientificChunker:
         for sentence in sentences:
             sentence_size = len(sentence)
 
-            # If adding this sentence exceeds limit → save chunk, start new one
+            # If adding this sentence exceeds limit -save chunk, start new one
             if current_size + sentence_size > self.chunk_size and current_chunk:
                 chunk_text = " ".join(current_chunk)
                 chunks.append(chunk_text)
 
-                # Overlap — keep last few sentences for next chunk
                 overlap_sentences = self._get_overlap_sentences(current_chunk)
                 current_chunk = overlap_sentences
                 current_size = sum(len(s) for s in overlap_sentences)
@@ -94,7 +92,7 @@ class ScientificChunker:
             current_chunk.append(sentence)
             current_size += sentence_size
 
-        # Don't forget the last chunk
+ 
         if current_chunk:
             chunks.append(" ".join(current_chunk))
 
@@ -117,32 +115,3 @@ class ScientificChunker:
         return overlap_sentences
 
 
-if __name__ == "__main__":
-    chunker = ScientificChunker(chunk_size=500, overlap=50)
-
-    # Find all parsed JSONs in outputs/
-    json_files = list(Path("outputs").glob("*_parsed.json"))
-
-    if not json_files:
-        print("No parsed JSONs found. Run parser.py first!")
-    else:
-        all_chunks = []
-        for json_file in json_files:
-            chunks = chunker.chunk_parsed_paper(str(json_file))
-            all_chunks.extend(chunks)
-
-        # Save all chunks
-        output_path = Path("outputs") / "all_chunks.json"
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(all_chunks, f, indent=2, ensure_ascii=False)
-
-        print(f"\nTotal chunks: {len(all_chunks)}")
-        print(f"Saved to {output_path}")
-
-        # Preview first chunk
-        if all_chunks:
-            print(f"\nSample chunk:")
-            print(f"  ID      : {all_chunks[0]['chunk_id']}")
-            print(f"  Section : {all_chunks[0]['metadata']['section']}")
-            print(f"  Page    : {all_chunks[0]['metadata']['page']}")
-            print(f"  Text    : {all_chunks[0]['text'][:100]}...")

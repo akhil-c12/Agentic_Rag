@@ -96,7 +96,6 @@ class ScientificPaperParser:
                         else:
                             current_text.append(text)
 
-        # Don't forget the last section
         if current_text:
             blocks.append({
                 "section": current_section,
@@ -143,21 +142,3 @@ class ScientificPaperParser:
 
         return figures
 
-
-# Test it
-if __name__ == "__main__":
-    parser = ScientificPaperParser()
-    
-    # Check if any PDFs exist in data/
-    pdf_files = list(Path("data").glob("*.pdf"))
-    
-    if not pdf_files:
-        print("No PDFs found in data/ folder!")
-        print("Drop any arxiv PDF into the data/ folder and run again.")
-    else:
-        for pdf in pdf_files:
-            result = parser.parse_pdf(str(pdf))
-            print(f"\nExtracted from {pdf.name}:")
-            print(f"  Sections: {len(result['sections'])}")
-            print(f"  Figures:  {len(result['figures'])}")
-            print(f"  Pages:    {result['total_pages']}")
