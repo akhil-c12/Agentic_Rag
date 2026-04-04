@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from google import genai
 from typing import List, Dict
 
-# Load environment variables
 load_dotenv()
 
 
@@ -105,36 +104,3 @@ FINAL ANSWER:"""
         }
 
 
-# ---------------- TEST ---------------- #
-
-if __name__ == "__main__":
-    mock_chunks = [
-        {
-            "text": "Transformers use self-attention mechanisms to process sequential data in parallel rather than recurrently.",
-            "metadata": {
-                "title": "Attention is All You Need",
-                "section": "Introduction",
-                "page": 1,
-                "filename": "vaswani2017.pdf"
-            }
-        },
-        {
-            "text": "The model achieves state of the art results on English to German translation with a BLEU score of 28.4.",
-            "metadata": {
-                "title": "Attention is All You Need",
-                "section": "Results",
-                "page": 7,
-                "filename": "vaswani2017.pdf"
-            }
-        }
-    ]
-
-    generator = AnswerGenerator()
-
-    result = generator.generate(
-        query="How do transformers process sequential data?",
-        chunks=mock_chunks
-    )
-
-    from pprint import pprint
-    pprint(result)
