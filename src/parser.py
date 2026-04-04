@@ -15,10 +15,7 @@ class ScientificPaperParser:
         (self.output_dir / "figures").mkdir(exist_ok=True)
 
     def parse_pdf(self, pdf_path: str) -> dict:
-        """
-        Extracts text, figures, tables and metadata from a scientific PDF
-        Returns a structured dict with all extracted content
-        """
+
         pdf_path = Path(pdf_path)
         doc = fitz.open(pdf_path)
         
@@ -36,17 +33,14 @@ class ScientificPaperParser:
         for page_num, page in enumerate(doc):
             print(f"  Processing page {page_num + 1}/{len(doc)}...")
             
-            # Extract text with structure
             text_blocks = self._extract_text_blocks(page, page_num)
             result["sections"].extend(text_blocks)
             
-            # Extract figures
             figures = self._extract_figures(page, page_num, pdf_path.stem)
             result["figures"].extend(figures)
 
         doc.close()
         
-        # Save parsed result as JSON
         output_path = self.output_dir / f"{pdf_path.stem}_parsed.json"
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2, ensure_ascii=False)
@@ -117,13 +111,11 @@ class ScientificPaperParser:
                 image_bytes = base_image["image"]
                 image_ext = base_image["ext"]
 
-                # Skip tiny images (logos, icons)
                 img_pil = Image.open(io.BytesIO(image_bytes))
                 width, height = img_pil.size
                 if width < 100 or height < 100:
                     continue
 
-                # Save figure
                 fig_filename = f"{pdf_stem}_page{page_num+1}_fig{img_idx+1}.{image_ext}"
                 fig_path = self.output_dir / "figures" / fig_filename
                 with open(fig_path, "wb") as f:

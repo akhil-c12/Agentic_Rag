@@ -11,9 +11,7 @@ import re
 
 class HybridIndexer:
     def __init__(self, embedding_model="all-MiniLM-L6-v2"):
-        """
-        all-MiniLM-L6-v2 — lightweight, fast, good quality
-        """
+
         self.model = SentenceTransformer(embedding_model)
         self.chunks = []
         self.bm25 = None
@@ -26,11 +24,9 @@ class HybridIndexer:
 
         texts = [c["text"] for c in self.chunks]
 
-        # Build BM25
         tokenized = [self._tokenize(t) for t in texts]
         self.bm25 = BM25Okapi(tokenized)
 
-        # Build FAISS
         embeddings = self.model.encode(texts, show_progress_bar=True)
         embeddings = np.array(embeddings).astype("float32")
 
@@ -38,7 +34,6 @@ class HybridIndexer:
         self.faiss_index = faiss.IndexFlatL2(dimension)
         self.faiss_index.add(embeddings)
 
-        # Save everything
         self._save()
         print("Index built and saved!")
 
@@ -46,7 +41,6 @@ class HybridIndexer:
         bm25_results = self._bm25_search(query, top_k)
         faiss_results = self._faiss_search(query, top_k)
 
-        # Merge using Reciprocal Rank Fusion
         combined = self._reciprocal_rank_fusion(bm25_results, faiss_results)
         return combined[:top_k]
 
@@ -67,11 +61,7 @@ class HybridIndexer:
         bm25_results: List[Tuple[int, float]],
         faiss_results: List[Tuple[int, float]],
         k: int = 60) -> List[Dict]:
-        """
-        RRF score = 1/(k + rank)
-        Higher score = more relevant
-        k=60 is standard in literature
-        """
+
         scores = {}
 
         for rank, (idx, _) in enumerate(bm25_results):
@@ -80,7 +70,6 @@ class HybridIndexer:
         for rank, (idx, _) in enumerate(faiss_results):
             scores[idx] = scores.get(idx, 0) + 1 / (k + rank + 1)
 
-        # Sort by combined score
         sorted_indices = sorted(scores.keys(), key=lambda i: scores[i], reverse=True)
 
         results = []
@@ -112,17 +101,3 @@ class HybridIndexer:
         print("Index loaded!")
 
 
-if __name__ == "__main__":
-    indexer = HybridIndexer()
-    indexer.build_index("outputs/all_chunks.json")
-
-    # Test search
-    indexer.load()
-    results = indexer.search("what is the main methodology used?", top_k=3)
-
-    print(f"\nTop results:")
-    for i, r in enumerate(results):
-        print(f"\n  Result {i+1}")
-        print(f"  Score   : {r['score']:.4f}")
-        print(f"  Section : {r['metadata']['section']}")
-        print(f"  Text    : {r['text'][:120]}...")

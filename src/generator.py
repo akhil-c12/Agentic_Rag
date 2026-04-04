@@ -1,57 +1,65 @@
 import os
-from pathlib import Path
 from dotenv import load_dotenv
-import google.generativeai as genai
+from google import genai
 from typing import List, Dict
 
+# Load environment variables
 load_dotenv()
+
 
 class AnswerGenerator:
     def __init__(self):
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        self.model = genai.GenerativeModel("gemini-1.5-flash")
-        print("Gemini loaded!")
+        api_key = os.getenv("GEMINI_API_KEY")
+
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not found in .env")
+
+        self.client = genai.Client(api_key=api_key)
+        self.model = "gemini-flash-latest"
 
     def generate(self, query: str, chunks: List[Dict]) -> Dict:
-        """
-        Takes query + retrieved chunks
-        Returns cited answer
-        """
         if not chunks:
-            return {
-                "answer": "No relevant chunks found.",
-                "citations": []
-            }
+            return self._format_response(
+                answer="No relevant chunks found.",
+                citations=[],
+                chunks_used=0
+            )
 
-        # Build context from chunks
         context = self._build_context(chunks)
-
-        # Build prompt
         prompt = self._build_prompt(query, context)
 
-        # Generate
-        response = self.model.generate_content(prompt)
-        answer = response.text
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=prompt
+            )
 
-        # Extract citations
+            answer = response.text.strip()
+
+        except Exception as e:
+            return self._format_response(
+                answer=f"LLM request failed: {str(e)}",
+                citations=[],
+                chunks_used=0
+            )
+
         citations = self._extract_citations(chunks)
 
-        return {
-            "answer": answer,
-            "citations": citations,
-            "chunks_used": len(chunks)
-        }
+        return self._format_response(
+            answer=answer,
+            citations=citations,
+            chunks_used=len(chunks)
+        )
 
     def _build_context(self, chunks: List[Dict]) -> str:
-        """
-        Formats chunks into readable context for Gemini
-        Each chunk labeled with its source
-        """
         context_parts = []
 
         for i, chunk in enumerate(chunks):
             meta = chunk["metadata"]
-            source = f"[Source {i+1}] Paper: {meta['title']} | Section: {meta['section']} | Page: {meta['page']}"
+            source = (
+                f"[Source {i+1}] "
+                f"{meta['title']} | {meta['section']} | Page {meta['page']}"
+            )
             context_parts.append(f"{source}\n{chunk['text']}")
 
         return "\n\n---\n\n".join(context_parts)
@@ -59,10 +67,11 @@ class AnswerGenerator:
     def _build_prompt(self, query: str, context: str) -> str:
         return f"""You are an expert scientific research assistant.
 
-Answer the following question using ONLY the provided context from research papers.
-Always cite your sources using [Source N] notation.
-If the context doesn't contain enough information, say so clearly.
-Be precise, technical, and concise.
+STRICT RULES:
+- Use ONLY the given context
+- Cite using [Source N]
+- Do NOT hallucinate
+- Be precise and technical
 
 CONTEXT:
 {context}
@@ -70,24 +79,35 @@ CONTEXT:
 QUESTION:
 {query}
 
-ANSWER (with citations):"""
+FINAL ANSWER:"""
 
     def _extract_citations(self, chunks: List[Dict]) -> List[Dict]:
-        citations = []
-        for i, chunk in enumerate(chunks):
-            meta = chunk["metadata"]
-            citations.append({
-                "source_num": i + 1,
-                "title": meta["title"],
-                "section": meta["section"],
-                "page": meta["page"],
-                "filename": meta["filename"]
-            })
-        return citations
+        return [
+            {
+                "source": i + 1,
+                "title": chunk["metadata"]["title"],
+                "section": chunk["metadata"]["section"],
+                "page": chunk["metadata"]["page"],
+                "file": chunk["metadata"]["filename"]
+            }
+            for i, chunk in enumerate(chunks)
+        ]
 
+    def _format_response(self, answer: str, citations: List[Dict], chunks_used: int) -> Dict:
+        return {
+            "status": "success" if citations else "no_data",
+            "answer": answer,
+            "metadata": {
+                "chunks_used": chunks_used,
+                "num_sources": len(citations)
+            },
+            "citations": citations
+        }
+
+
+# ---------------- TEST ---------------- #
 
 if __name__ == "__main__":
-    # Test with mock chunks
     mock_chunks = [
         {
             "text": "Transformers use self-attention mechanisms to process sequential data in parallel rather than recurrently.",
@@ -110,13 +130,11 @@ if __name__ == "__main__":
     ]
 
     generator = AnswerGenerator()
+
     result = generator.generate(
         query="How do transformers process sequential data?",
         chunks=mock_chunks
     )
 
-    print("\nAnswer:")
-    print(result["answer"])
-    print("\nCitations:")
-    for c in result["citations"]:
-        print(f"  [Source {c['source_num']}] {c['title']} — {c['section']}, Page {c['page']}")
+    from pprint import pprint
+    pprint(result)
